@@ -1,0 +1,31 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: elements.xp.semds.example.com
+spec:
+  scope: Namespaced
+  group: xp.semds.example.com
+  names:
+    kind: Element
+    plural: elements
+  versions:
+    - name: v1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [name, description]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            status:
+              type: object
+              properties:
+                elementId:
+                  type: integer

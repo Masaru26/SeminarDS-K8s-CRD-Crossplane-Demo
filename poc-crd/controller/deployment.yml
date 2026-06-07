@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: semds-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: element-controller
+  namespace: semds-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: element-controller
+rules:
+  - apiGroups: ["semds.example.com"]
+    resources: ["elements", "elements/status", "elements/finalizers"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: element-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: element-controller
+subjects:
+  - kind: ServiceAccount
+    name: element-controller
+    namespace: semds-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: element-controller
+  namespace: semds-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: element-controller
+  template:
+    metadata:
+      labels:
+        app: element-controller
+    spec:
+      serviceAccountName: element-controller
+      containers:
+        - name: controller
+          image: semds/element-controller:0.1.0
+          imagePullPolicy: Never
+          env:
+            - name: TESTAPI_URL
+              value: "http://testapi.default.svc.cluster.local:3000"
+            - name: RECONCILE_INTERVAL
+              value: "15"

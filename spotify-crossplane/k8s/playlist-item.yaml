@@ -1,0 +1,123 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: spotifyplaylistitems.music.example.org
+spec:
+  scope: Namespaced
+  group: music.example.org
+  names:
+    kind: SpotifyPlaylistItem
+    plural: spotifyplaylistitems
+  versions:
+  - name: v1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required: [playlistRef, trackId]
+            properties:
+              playlistRef:
+                type: object
+                required: [name]
+                properties:
+                  name:
+                    type: string
+              trackId:
+                type: string
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: spotifyplaylistitems.music.example.org
+spec:
+  compositeTypeRef:
+    apiVersion: music.example.org/v1
+    kind: SpotifyPlaylistItem
+  mode: Pipeline
+  pipeline:
+  - step: fetch-deps
+    functionRef:
+      name: function-extra-resources
+    input:
+      apiVersion: extra-resources.fn.crossplane.io/v1beta1
+      kind: Input
+      spec:
+        extraResources:
+        - kind: SpotifyPlaylist
+          apiVersion: music.example.org/v1
+          namespace: default
+          into: playlists
+          type: Selector
+          selector:
+            matchLabels:
+            - key: music.example.org/managed-by
+              type: Value
+              value: spotify-crossplane
+  - step: render
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{- $extras := index .context "apiextensions.crossplane.io/extra-resources" -}}
+          {{- $playlists := index $extras "playlists" -}}
+          {{- $target := .observed.composite.resource.spec.playlistRef.name -}}
+          {{- $tid := .observed.composite.resource.spec.trackId -}}
+          {{- $pid := "" -}}
+          {{- range $playlists -}}
+            {{- if eq .metadata.name $target -}}
+              {{- with .status -}}
+                {{- with .playlistId -}}
+                  {{- $pid = . -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
+          {{- end -}}
+          {{- if $pid }}
+          apiVersion: http.m.crossplane.io/v1alpha2
+          kind: Request
+          metadata:
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: add-track
+          spec:
+            forProvider:
+              headers:
+                Content-Type:
+                - application/json
+              payload:
+                baseUrl: https://api.spotify.com
+                body: |
+                  {"playlistId":"{{ $pid }}","trackId":"{{ $tid }}","uris":["spotify:track:{{ $tid }}"]}
+              mappings:
+              - action: CREATE
+                url: .payload.baseUrl + "/v1/playlists/" + (.payload.body.playlistId | tostring) + "/items"
+                body: |
+                  {uris: .payload.body.uris}
+              - action: OBSERVE
+                url: .payload.baseUrl + "/v1/playlists/" + (.payload.body.playlistId | tostring) + "/items?fields=items(item(id))&limit=100"
+              - action: UPDATE
+                method: POST
+                url: .payload.baseUrl + "/v1/playlists/" + (.payload.body.playlistId | tostring) + "/items"
+                body: |
+                  {uris: .payload.body.uris}
+              - action: REMOVE
+                method: DELETE
+                url: .payload.baseUrl + "/v1/playlists/" + (.payload.body.playlistId | tostring) + "/items"
+                body: |
+                  {items: [{uri: .payload.body.uris[0]}]}
+              expectedResponseCheck:
+                type: CUSTOM
+                logic: |
+                  .payload.body.trackId as $tid
+                  | (.response.body.items // []) | any(.item.id == $tid)
+            providerConfigRef:
+              kind: ProviderConfig
+              name: default
+          {{- end }}

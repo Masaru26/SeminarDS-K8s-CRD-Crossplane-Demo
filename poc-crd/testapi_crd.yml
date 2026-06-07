@@ -1,0 +1,35 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: elements.semds.example.com
+spec:
+  group: semds.example.com
+  scope: Namespaced
+  names:
+    kind: Element
+    listKind: ElementList
+    plural: elements
+    singular: element
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [name, description]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            status:
+              type: object
+              properties:
+                elementId:
+                  type: integer

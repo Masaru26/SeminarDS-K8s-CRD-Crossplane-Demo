@@ -1,0 +1,12 @@
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: ProviderConfig
+metadata:
+  name: default
+  namespace: default
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: spotify-access-token
+      key: authorization

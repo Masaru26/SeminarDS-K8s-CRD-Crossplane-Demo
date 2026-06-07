@@ -1,0 +1,29 @@
+apiVersion: music.example.org/v1
+kind: SpotifyPlaylist
+metadata:
+  name: bohemian-playlist
+  namespace: default
+  labels:
+    music.example.org/managed-by: spotify-crossplane
+spec:
+  name: "Bohemian Rhapsody Lover Playlist"
+---
+apiVersion: music.example.org/v1
+kind: SpotifyPlaylistItem
+metadata:
+  name: bohemian-track
+  namespace: default
+spec:
+  playlistRef:
+    name: bohemian-playlist
+  trackId: "3z8h0TU7ReDPLIbEnYhWZb"
+---
+apiVersion: music.example.org/v1
+kind: SpotifyPlaylistItem
+metadata: 
+  name: another-track
+  namespace: default
+spec:
+  playlistRef: 
+    name: bohemian-playlist
+  trackId: "4u7EnebtmKWzUH433cf5Qv"

@@ -1,0 +1,116 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: spotifyplaylists.music.example.org
+spec:
+  scope: Namespaced
+  group: music.example.org
+  names:
+    kind: SpotifyPlaylist
+    plural: spotifyplaylists
+  versions:
+  - name: v1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+          status:
+            type: object
+            properties:
+              playlistId:
+                type: string
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: spotifyplaylists.music.example.org
+spec:
+  compositeTypeRef:
+    apiVersion: music.example.org/v1
+    kind: SpotifyPlaylist
+  mode: Pipeline
+  pipeline:
+  - step: render
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{- $name := .observed.composite.resource.spec.name -}}
+          {{- $playlistId := "" -}}
+          {{- if .observed.composite.resource.status -}}
+            {{- with .observed.composite.resource.status.playlistId -}}
+              {{- $playlistId = . -}}
+            {{- end -}}
+          {{- end -}}
+          apiVersion: http.m.crossplane.io/v1alpha2
+          kind: Request
+          metadata:
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: create-playlist
+          spec:
+            forProvider:
+              headers:
+                Content-Type:
+                - application/json
+              payload:
+                baseUrl: https://api.spotify.com
+                body: |
+                  {"name":"{{ $name }}","description":"Managed by Crossplane","public":false,"playlistId":"{{ $playlistId }}"}
+              mappings:
+              - action: CREATE
+                url: .payload.baseUrl + "/v1/me/playlists"
+                body: |
+                  {name: .payload.body.name, description: .payload.body.description, public: .payload.body.public}
+              - action: OBSERVE
+                url: |
+                  if .payload.body.playlistId == ""
+                  then .payload.baseUrl + "/v1/playlists/empty"
+                  else .payload.baseUrl + "/v1/me/library/contains?uris=spotify:playlist:" + .payload.body.playlistId
+                  end
+              - action: UPDATE
+                method: PUT
+                url: .payload.baseUrl + "/v1/playlists/" + (.payload.body.playlistId | tostring) + "/followers"
+                body: '{"public":false}'
+              # Spotify has no "delete playlist" -> removing it means unfollowing
+              - action: REMOVE
+                method: DELETE
+                url: .payload.baseUrl + "/v1/playlists/" + (.payload.body.playlistId | tostring) + "/followers"
+              expectedResponseCheck:
+                type: CUSTOM
+                logic: |
+                  .payload.body.playlistId as $pid
+                  | if $pid == "" then true
+                    else (.response.body // []) | .[0] == true
+                    end
+            providerConfigRef:
+              kind: ProviderConfig
+              name: default
+          {{- $resolvedId := $playlistId }}
+          {{- if .observed.resources }}
+          {{- $req := index .observed.resources "create-playlist" }}
+          {{- if and $req $req.resource.status.response }}
+          {{- $body := $req.resource.status.response.body | fromJson }}
+          {{- if and (kindIs "map" $body) $body.id }}
+          {{- $resolvedId = $body.id }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if $resolvedId }}
+          ---
+          apiVersion: music.example.org/v1
+          kind: SpotifyPlaylist
+          status:
+            playlistId: {{ $resolvedId | quote }}
+          {{- end }}

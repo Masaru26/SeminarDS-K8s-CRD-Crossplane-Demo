@@ -1,0 +1,7 @@
+apiVersion: semds.example.com/v1
+kind: Element
+metadata:
+  name: foo
+spec:
+  name: "Element Foo"
+  description: "Created via Kubernetes."
