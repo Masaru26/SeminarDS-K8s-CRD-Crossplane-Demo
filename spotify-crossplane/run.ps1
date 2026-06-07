@@ -8,7 +8,7 @@
 #     (run `python refresh_token.py` once without REFRESH_TOKEN to bootstrap it)
 #
 # Note: if the provider-http pod CrashLoops on a "customresourcedefinitions ...
-# is forbidden" error, apply ../poc-crossplane-simpel/install/30-provider-http-extra-rbac.yml
+# is forbidden" error, apply ../poc-crossplane/install/02-provider-http-extra-rbac.yml
 # and restart the provider deployment.
 
 $ErrorActionPreference = "Stop"
@@ -21,8 +21,8 @@ try {
         --namespace crossplane-system --create-namespace --version 2.3.1 --wait
 
     Write-Host "==> Installing provider-http and composition functions" -ForegroundColor Cyan
-    kubectl apply -f k8s/provider.yaml
-    kubectl apply -f k8s/functions.yaml
+    kubectl apply -f k8s/01-provider.yaml
+    kubectl apply -f k8s/02-functions.yaml
 
     Write-Host "==> Waiting for the provider and functions to become Healthy" -ForegroundColor Cyan
     kubectl wait --for=condition=Healthy --timeout=300s provider.pkg.crossplane.io/provider-http
@@ -37,17 +37,17 @@ try {
     }
 
     Write-Host "==> Applying the ProviderConfig" -ForegroundColor Cyan
-    kubectl apply -f k8s/provider-config.yaml
+    kubectl apply -f k8s/03-provider-config.yaml
 
     Write-Host "==> Applying XRDs and Compositions" -ForegroundColor Cyan
-    kubectl apply -f k8s/playlist.yaml
-    kubectl apply -f k8s/playlist-item.yaml
+    kubectl apply -f k8s/04-playlist.yaml
+    kubectl apply -f k8s/05-playlist-item.yaml
     kubectl wait --for=condition=Established --timeout=120s `
         crd/spotifyplaylists.music.example.org `
         crd/spotifyplaylistitems.music.example.org
 
     Write-Host "==> Applying the example resources" -ForegroundColor Cyan
-    kubectl apply -f k8s/example-resources.yaml
+    kubectl apply -f k8s/06-example-resources.yaml
 
     Write-Host ""
     Write-Host "Done. Watch the resources reconcile with:" -ForegroundColor Green

@@ -18,16 +18,16 @@ try {
     kubectl delete spotifyplaylist     --all -n default --ignore-not-found
 
     Write-Host "==> Deleting Compositions and XRDs" -ForegroundColor Cyan
-    kubectl delete -f k8s/playlist-item.yaml --ignore-not-found
-    kubectl delete -f k8s/playlist.yaml      --ignore-not-found
+    kubectl delete -f k8s/05-playlist-item.yaml --ignore-not-found
+    kubectl delete -f k8s/04-playlist.yaml      --ignore-not-found
 
     Write-Host "==> Deleting ProviderConfig and Secret" -ForegroundColor Cyan
-    kubectl delete -f k8s/provider-config.yaml --ignore-not-found
+    kubectl delete -f k8s/03-provider-config.yaml --ignore-not-found
     kubectl delete secret spotify-access-token -n crossplane-system --ignore-not-found
 
     Write-Host "==> Deleting functions and provider-http" -ForegroundColor Cyan
-    kubectl delete -f k8s/functions.yaml --ignore-not-found
-    kubectl delete -f k8s/provider.yaml  --ignore-not-found
+    kubectl delete -f k8s/02-functions.yaml --ignore-not-found
+    kubectl delete -f k8s/01-provider.yaml  --ignore-not-found
 
     Write-Host ""
     Write-Host "Done. Crossplane core is left installed." -ForegroundColor Green
